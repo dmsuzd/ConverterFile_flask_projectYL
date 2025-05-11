@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card converter-card fade-in">
+            <div class="card-body p-5">
+                <div class="text-center mb-4">
+                    <i class="fas fa-exchange-alt icon-large"></i>
+                    <h2 class="card-title">Конвертер PDF ↔ Word</h2>
+                    <p class="text-muted">Преобразуйте документы между форматами быстро и легко</p>
+                </div>
+
+                <form method="POST" action="{{ url_for('upload_file') }}" enctype="multipart/form-data" class="needs-validation" novalidate>
+                    <div class="mb-4">
+                        <label for="fileInput" class="form-label">Выберите файл:</label>
+                        <input class="form-control" type="file" id="fileInput" name="file"
+                               accept=".pdf,.docx" required>
+                        <div class="form-text">
+                            Для конвертации в Word разрешены только PDF-файлы.<br>
+                            Для конвертации в PDF - только DOCX-файлы.
+                        </div>
+                        <div class="invalid-feedback">Пожалуйста, выберите файл</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="conversionType" class="form-label">Тип конвертации:</label>
+                        <select class="form-select" id="conversionType" name="conversion_type" required>
+                            <option value="" selected disabled>Выберите тип...</option>
+                            <option value="pdf_to_word">PDF в Word</option>
+                            <option value="word_to_pdf">Word в PDF</option>
+                        </select>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-sync-alt me-2"></i> Конвертировать
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form.needs-validation');
+    const fileInput = document.getElementById('fileInput');
+    const conversionType = document.getElementById('conversionType');
+    const convertBtn = form.querySelector('button[type="submit"]');
+    const originalBtnText = convertBtn.innerHTML;
+
+    // Обновляем accept-атрибут при изменении типа конвертации
+    conversionType.addEventListener('change', function() {
+        fileInput.setAttribute('accept', this.value === 'pdf_to_word' ? '.pdf' : '.docx,.doc');
+    });
+
+    form.addEventListener('submit', async function(event) {
+        event.preventDefault();
+
+        if (!form.checkValidity()) {
+            event.stopPropagation();
+            form.classList.add('was-validated');
+            return;
+        }
+
+        // Показываем состояние загрузки
+        convertBtn.innerHTML = `
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            Обработка...
+        `;
+        convertBtn.disabled = true;
+
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) throw new Error(data.error || 'Неизвестная ошибка сервера');
+
+            if (data.success) {
+                // Успешная конвертация
+                showSuccessAlert('Конвертация завершена!', data.download_url);
+                form.reset();
+                form.classList.remove('was-validated');
+            } else {
+                // Ошибка конвертации
+                throw new Error(data.error || 'Ошибка при конвертации файла');
+            }
+        } catch (error) {
+            // Обработка ошибок
+            showErrorAlert(error.message);
+
+            // Добавляем анимацию ошибки
+            convertBtn.classList.add('btn-error');
+            setTimeout(() => convertBtn.classList.remove('btn-error'), 500);
+        } finally {
+            // Всегда восстанавливаем кнопку
+            convertBtn.innerHTML = originalBtnText;
+            convertBtn.disabled = false;
+        }
+    });
+
+    // Функции для отображения уведомлений
+    function showSuccessAlert(message, downloadUrl) {
+        const alertHtml = `
+        <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+            ${message}
+            <a href="${downloadUrl}" class="alert-link">Скачать файл</a>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        `;
+        form.insertAdjacentHTML('afterend', alertHtml);
+    }
+
+    function showErrorAlert(message) {
+        const alertHtml = `
+        <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        `;
+        form.insertAdjacentHTML('afterend', alertHtml);
+    }
+});
+</script>
+
+<style>
+.btn-error {
+    animation: shake 0.5s;
+    border-color: #dc3545 !important;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+</style>
+{% endblock %}
+
